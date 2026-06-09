@@ -1,4 +1,4 @@
-# GRUPO 9 - GETWAITTIME()
+# GRUPO 9 - GETWAITTIME() E SRTF
 ---
 * Integrantes
     * Felipe Fernandes Morotti  12421BCC063
