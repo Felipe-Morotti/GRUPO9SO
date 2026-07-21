@@ -1,33 +1,53 @@
 # Códigos gerados para implementação do trabalho de SO
+
+Este documento reúne todo o código novo/alterado em relação ao repositório oficial do xv6, organizado por arquivo, para a implementação da chamada de sistema `getwaittime()` e do escalonador SRTF.
+
 ---
-* Kernel
-* defs.h
+
+## Kernel
+
+### kernel/defs.h
+
+```c
 void            update_time(void);
+```
 
-* proc.c
+### kernel/proc.c
+
+Inicialização dos novos campos em `allocproc()`:
+
+```c
 // Felipe
-  p->ctime = ticks;     // Tick de criação
-  p->rtime = 0;  // Ticks acumulados rodando (RUNNING)
-  p->wtime = 0;  // Ticks acumulados em espera (RUNNABLE)
-  p->burst = 0;  // Escalonador trata como desconhecido = 0
+p->ctime = ticks;     // Tick de criação
+p->rtime = 0;          // Ticks acumulados rodando (RUNNING)
+p->wtime = 0;          // Ticks acumulados em espera (RUNNABLE)
+p->burst = 0;          // Escalonador trata como desconhecido = 0
+```
 
+Função auxiliar de contabilização de ticks, chamada por `clockintr()`:
+
+```c
 // Felipe
 // Helper para os ticks
 void
 update_time(void)
 {
- struct proc *p;
+  struct proc *p;
 
   for (p = proc; p < &proc[NPROC]; p++) {
     acquire(&p->lock);
 
     if (p->state == RUNNING) p->rtime++;
     else if (p->state == RUNNABLE) p->wtime++;
-    
+
     release(&p->lock);
   }
 }
+```
 
+Escalonador reescrito para SRTF:
+
+```c
 void
 scheduler(void)
 {
@@ -42,9 +62,9 @@ scheduler(void)
     struct proc *chosen = 0;
     int best_remaining = 2147483647;
 
-    for(p = proc; p < &proc[NPROC]; p++) {
+    for (p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE) {
+      if (p->state == RUNNABLE) {
         int remaining;
         if (p->burst > 0)
           remaining = p->burst - p->rtime;
@@ -74,37 +94,59 @@ scheduler(void)
     if (found == 0) {
       intr_on();
       asm volatile("wfi");
-    } 
+    }
   }
 }
+```
 
-* proc.h
-  // Felipe
-  int ctime;    // Tick de criação
-  int rtime;    // Ticks acumulados running
-  int wtime;    // Ticks acumulados runnable
-  int etime;    // Ticks para turnaround
-  int burst;    // Ticks de CPU esperados, inicializado por setburst()
+### kernel/proc.h
 
+Novos campos em `struct proc`:
+
+```c
+// Felipe
+int ctime;    // Tick de criação
+int rtime;    // Ticks acumulados running
+int wtime;    // Ticks acumulados runnable
+int etime;    // Ticks para turnaround
+int burst;    // Ticks de CPU esperados, inicializado por setburst()
+```
+
+Declaração extern do vetor global de processos:
+
+```c
 extern struct proc proc[NPROC];
+```
 
-* syscall.c
+### kernel/syscall.c
+
+```c
 // Felipe
 extern uint64 sys_getwaittime(void);
 extern uint64 sys_setburst(void);
 extern uint64 sys_setburstpid(void);
+```
 
-[SYS_getwaittime] sys_getwaittime, // Felipe
-[SYS_setburst] sys_setburst,
-[SYS_setburstpid] sys_setburstpid,
+Entradas no vetor `syscalls[]`:
 
-* syscall.h
+```c
+[SYS_getwaittime]   sys_getwaittime, // Felipe
+[SYS_setburst]      sys_setburst,
+[SYS_setburstpid]   sys_setburstpid,
+```
+
+### kernel/syscall.h
+
+```c
 // Felipe
-#define SYS_getwaittime 23
-#define SYS_setburst 24
-#define SYS_setburstpid 25
+#define SYS_getwaittime  23
+#define SYS_setburst     24
+#define SYS_setburstpid  25
+```
 
-* sysproc.c
+### kernel/sysproc.c
+
+```c
 // Felipe
 uint64
 sys_getwaittime(void)
@@ -144,8 +186,11 @@ sys_setburstpid(void)
   }
   return found ? 0 : -1;
 }
+```
 
-* trap.c
+### kernel/trap.c
+
+```c
 // Felipe
 void
 clockintr()
@@ -157,21 +202,34 @@ clockintr()
     release(&tickslock);
 
     update_time(); // mudança principal
+  }
 }
+```
 
-* User
-* user.h
+---
+
+## User
+
+### user/user.h
+
+```c
 // Felipe
 int getwaittime(void);
 int setburst(int);
 int setburstpid(int, int);
+```
 
-* usys.pl
+### user/usys.pl
+
+```perl
 entry("getwaittime");
 entry("setburst");
 entry("setburstpid");
+```
 
-* waittest.c
+### user/waittest.c
+
+```c
 // user/waittest.c
 //
 // Test harness for getwaittime() and SRTF validation.
@@ -278,6 +336,14 @@ main(int argc, char *argv[])
   printf("[parent] all children done\n");
   exit(0);
 }
+```
 
-* Makefile
+---
+
+## Makefile
+
+Linha adicionada a `UPROGS`:
+
+```makefile
 $U/_waittest\
+```
